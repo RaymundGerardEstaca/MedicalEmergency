@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "NetworkStreamViewer",
+    "slug": "network-stream-viewer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-av",
+      "expo-secure-store",
+      "expo-asset",
+      "expo-font",
+      "@react-native-google-signin/google-signin"
+    ],
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.networkstreamviewer",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "This app requires access to your local network to discover and connect to cameras on your WiFi network.",
+        "NSCameraUsageDescription": "This app needs camera access for video streaming."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "googleServicesFile": "./config/google-services.json",
+      "package": "com.yourcompany.networkstreamviewer",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_WIFI_STATE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.VIBRATE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ff96cee5-c45f-4e26-86eb-1fbc8b6361e3"
+      }
+    }
+  }
+}
