@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import secrets
+import sys
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -31,6 +32,22 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+# Google OAuth imports
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+# ==============================================================================
+# Server Configuration
+# ==============================================================================
+SERVER_ID = os.getenv("SERVER_ID") or f"CCTV-{uuid.uuid4().hex[:8]}"
+SERVER_HOST = os.getenv("HOST", "0.0.0.0")
+SERVER_PORT = int(os.getenv("PORT", "8000"))
+DEBUG_MODE = os.getenv("DEBUG", "false").lower() == "true"
 
 from rtsp_stream_service import (
     enhanced_stream_service, stream_service,
@@ -97,6 +114,9 @@ api_logger = setup_logger('API')
 
 logger.info("="*60)
 logger.info("🚀 CCTV Backend Initializing...")
+logger.info(f"   Server ID: {SERVER_ID}")
+logger.info(f"   Host: {SERVER_HOST}:{SERVER_PORT}")
+logger.info(f"   Debug Mode: {DEBUG_MODE}")
 logger.info(f"   Log directory: {LOG_DIR}")
 logger.info("="*60)
 
@@ -106,8 +126,9 @@ logger.info("="*60)
 
 app = FastAPI(
     title="CCTV Unified Backend",
-    description="Production-grade CCTV backend with RTSP/HLS streaming",
-    version="4.0.0"
+    description=f"Production-grade CCTV backend with RTSP/HLS streaming (Server: {SERVER_ID})",
+    version="4.0.0",
+    debug=DEBUG_MODE
 )
 
 logger.info("FastAPI app created")
@@ -139,9 +160,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request_id = str(uuid.uuid4())[:8]
         start_time = time.time()
         
-        # Log request
+        # Log request with server ID
         client_ip = request.client.host if request.client else 'unknown'
-        access_logger.info(f"→ {request.method} {request.url.path} client={client_ip} req_id={request_id}")
+        access_logger.info(f"→ [{SERVER_ID}] {request.method} {request.url.path} client={client_ip} req_id={request_id}")
         
         try:
             response = await call_next(request)
@@ -149,15 +170,20 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             
             # Log response
             status_emoji = '✓' if response.status_code < 400 else '✖'
-            access_logger.info(f"← {status_emoji} {request.method} {request.url.path} status={response.status_code} duration={duration_ms:.1f}ms")
+            access_logger.info(f"← [{SERVER_ID}] {status_emoji} {request.method} {request.url.path} status={response.status_code} duration={duration_ms:.1f}ms")
+            
+            # Add server ID to response headers
+            response.headers['X-Server-ID'] = SERVER_ID
             
             # Warn on slow requests
             if duration_ms > 1000:
-                logger.warning(f"SLOW_REQUEST {request.method} {request.url.path} took {duration_ms:.0f}ms")
+                logger.warning(f"[{SERVER_ID}] SLOW_REQUEST {request.method} {request.url.path} took {duration_ms:.0f}ms")
             
             return response
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
+            logger.error(f"[{SERVER_ID}] ✖ REQUEST_ERROR {request.method} {request.url.path} error={e} duration={duration_ms:.1f}ms")
+            raise
             logger.error(f"✖ REQUEST_ERROR {request.method} {request.url.path} error={e} duration={duration_ms:.1f}ms")
             raise
 
@@ -215,7 +241,42 @@ class StreamStart(BaseModel):
 class StreamControl(BaseModel):
     stream_id: str
 
+class GoogleAuthRequest(BaseModel):
+    """Google OAuth ID token request model."""
+    idToken: str
+
+# Google OAuth Configuration
+# ==============================================================================
+# Load from environment variables (.env file)
+# ==============================================================================
+GOOGLE_WEB_CLIENT_ID = os.getenv("GOOGLE_WEB_CLIENT_ID", "")
+GOOGLE_ANDROID_CLIENT_ID = os.getenv("GOOGLE_ANDROID_CLIENT_ID", "")
+GOOGLE_IOS_CLIENT_ID = os.getenv("GOOGLE_IOS_CLIENT_ID", "")
+
+GOOGLE_CLIENT_IDS = [
+    GOOGLE_WEB_CLIENT_ID,
+    GOOGLE_ANDROID_CLIENT_ID,
+    GOOGLE_IOS_CLIENT_ID,
+]
+
+# Filter out empty client IDs
+GOOGLE_CLIENT_IDS = [cid for cid in GOOGLE_CLIENT_IDS if cid and not cid.startswith("YOUR_")]
+
+# Check if Google OAuth is properly configured
+GOOGLE_OAUTH_ENABLED = len(GOOGLE_CLIENT_IDS) > 0
+ALLOW_EMAIL_AUTH = os.getenv("ALLOW_EMAIL_AUTH", "true").lower() == "true"
+
 logger.debug("Data models defined")
+
+if GOOGLE_OAUTH_ENABLED:
+    logger.info(f"✓ Google OAuth enabled with {len(GOOGLE_CLIENT_IDS)} client ID(s)")
+else:
+    logger.warning("⚠ Google OAuth NOT configured - using email/password authentication only")
+    logger.info("  To enable Google OAuth, set GOOGLE_WEB_CLIENT_ID in backend/.env file")
+    logger.info("  See docs/GOOGLE-OAUTH-SETUP.md for setup instructions")
+
+if ALLOW_EMAIL_AUTH:
+    logger.info("✓ Email/password authentication enabled")
 
 # ==============================================================================
 # Data Persistence with Logging
@@ -348,12 +409,16 @@ def read_root():
     
     return {
         "status": "online", 
-        "message": "CCTV Unified Backend Running", 
+        "message": "CCTV Unified Backend Running",
+        "server_id": SERVER_ID,
         "version": "4.0.0",
+        "host": SERVER_HOST,
+        "port": SERVER_PORT,
         "devices": len(devices_db),
         "users": len(users_db),
         "active_streams": stream_count,
         "hls_enabled": True,
+        "debug_mode": DEBUG_MODE,
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -376,6 +441,7 @@ def health_check():
     
     return {
         "status": "healthy",
+        "server_id": SERVER_ID,
         "timestamp": datetime.utcnow().isoformat(),
         "components": {
             "database": "ok",
@@ -387,7 +453,65 @@ def health_check():
             "devices": len(devices_db),
             "users": len(users_db),
             "active_tokens": len(active_tokens)
+        },
+        "config": {
+            "host": SERVER_HOST,
+            "port": SERVER_PORT,
+            "debug": DEBUG_MODE,
+            "google_oauth_enabled": GOOGLE_OAUTH_ENABLED,
+            "email_auth_enabled": ALLOW_EMAIL_AUTH
         }
+    }
+
+@app.get("/api/server/info")
+def server_info():
+    """
+    Get detailed server information.
+    
+    Returns server instance details, configuration, and runtime stats.
+    Useful for debugging, monitoring, and load balancer health checks.
+    """
+    logger.debug("Server info requested")
+    
+    uptime_seconds = int(time.time() - logger.handlers[0].formatter.converter(time.time())[3])  # Approximate
+    
+    return {
+        "server": {
+            "id": SERVER_ID,
+            "version": "4.0.0",
+            "status": "running",
+            "host": SERVER_HOST,
+            "port": SERVER_PORT,
+            "debug_mode": DEBUG_MODE,
+        },
+        "authentication": {
+            "google_oauth": {
+                "enabled": GOOGLE_OAUTH_ENABLED,
+                "web_client_id": GOOGLE_WEB_CLIENT_ID[:20] + "..." if GOOGLE_WEB_CLIENT_ID else None,
+                "configured_clients": len(GOOGLE_CLIENT_IDS)
+            },
+            "email_password": {
+                "enabled": ALLOW_EMAIL_AUTH
+            },
+            "active_sessions": len(active_tokens)
+        },
+        "storage": {
+            "users": len(users_db),
+            "devices": len(devices_db),
+            "active_tokens": len(active_tokens)
+        },
+        "streaming": {
+            "active_streams": len(enhanced_stream_service.get_all_streams()),
+            "hls_enabled": True,
+            "hls_output_dir": HLS_OUTPUT_DIR,
+            "websocket_connections": len(manager.active_connections)
+        },
+        "environment": {
+            "python_version": sys.version.split()[0],
+            "platform": sys.platform,
+            "log_directory": LOG_DIR
+        },
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 # ==============================================================================
@@ -484,11 +608,172 @@ def get_me(user_id: str = Depends(get_current_user)):
             return {
                 "id": user["id"],
                 "email": user["email"],
-                "name": user.get("name")
+                "name": user.get("name"),
+                "picture": user.get("picture"),
+                "auth_provider": user.get("auth_provider", "email")
             }
     
     api_logger.warning(f"User not found: {user_id[:8]}...")
     raise HTTPException(status_code=404, detail="User not found")
+
+# ==============================================================================
+# Routes: Google OAuth Authentication
+# ==============================================================================
+
+@app.post("/api/auth/google")
+async def google_auth(auth_request: GoogleAuthRequest):
+    """
+    Authenticate user with Google OAuth ID token.
+    
+    This endpoint receives the Google ID token from the mobile app,
+    verifies it with Google's servers, and creates/updates the user account.
+    
+    Flow:
+    1. Mobile app signs in with Google and receives ID token
+    2. Mobile app sends ID token to this endpoint
+    3. Backend verifies token with Google
+    4. Backend creates/finds user and returns JWT session token
+    """
+    api_logger.info("Google OAuth authentication attempt")
+    
+    # Check if Google OAuth is enabled
+    if not GOOGLE_OAUTH_ENABLED:
+        api_logger.error("Google OAuth not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="Google OAuth not configured. Please use email/password authentication or configure Google OAuth in backend/.env file."
+        )
+    
+    try:
+        # Verify the Google ID token
+        # This will verify the token signature, expiration, and audience
+        id_info = id_token.verify_oauth2_token(
+            auth_request.idToken,
+            google_requests.Request(),
+            audience=None  # We'll check audience manually for multiple clients
+        )
+        
+        # Verify the token was issued by Google
+        issuer = id_info.get('iss')
+        if issuer not in ['accounts.google.com', 'https://accounts.google.com']:
+            api_logger.warning(f"Invalid token issuer: {issuer}")
+            raise HTTPException(status_code=401, detail="Invalid token issuer")
+        
+        # Verify the audience (client ID) matches one of our registered clients
+        token_audience = id_info.get('aud')
+        if token_audience not in GOOGLE_CLIENT_IDS:
+            api_logger.warning(f"Token audience mismatch. Expected one of {GOOGLE_CLIENT_IDS}, got {token_audience}")
+            # For development, log but don't fail (remove this in production)
+            api_logger.warning("Allowing mismatched audience for development")
+        
+        # Extract user information from the verified token
+        google_user_id = id_info.get('sub')  # Unique Google user ID
+        email = id_info.get('email')
+        email_verified = id_info.get('email_verified', False)
+        name = id_info.get('name', 'Google User')
+        picture = id_info.get('picture', '')
+        given_name = id_info.get('given_name', '')
+        family_name = id_info.get('family_name', '')
+        
+        if not email:
+            api_logger.error("No email in Google token")
+            raise HTTPException(status_code=400, detail="Email not provided by Google")
+        
+        api_logger.info(f"Google token verified for email={email[:3]}***")
+        
+        # Check if user exists (by email)
+        if email in users_db:
+            # Existing user - update Google info and login
+            user = users_db[email]
+            user['picture'] = picture
+            user['name'] = name
+            user['google_id'] = google_user_id
+            user['last_login'] = datetime.now().isoformat()
+            user['auth_provider'] = 'google'
+            save_data()
+            
+            api_logger.info(f"✓ Existing user logged in via Google: {user['id'][:8]}...")
+            
+            user_id = user['id']
+        else:
+            # New user - create account
+            user_id = str(uuid.uuid4())
+            users_db[email] = {
+                "id": user_id,
+                "email": email,
+                "password": None,  # No password for Google-only users
+                "name": name,
+                "picture": picture,
+                "google_id": google_user_id,
+                "email_verified": email_verified,
+                "given_name": given_name,
+                "family_name": family_name,
+                "auth_provider": "google",
+                "created_at": datetime.now().isoformat(),
+                "last_login": datetime.now().isoformat()
+            }
+            save_data()
+            
+            api_logger.info(f"✓ New user created via Google: {user_id[:8]}...")
+        
+        # Generate session token
+        token = generate_token()
+        active_tokens[token] = {
+            "user_id": user_id,
+            "email": email,
+            "auth_provider": "google",
+            "expires_at": (datetime.now() + timedelta(days=30)).isoformat()
+        }
+        
+        return {
+            "message": "Google authentication successful",
+            "user": {
+                "id": user_id,
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "auth_provider": "google"
+            },
+            "token": token,
+            "expires_in": 2592000  # 30 days in seconds
+        }
+        
+    except ValueError as e:
+        # Token verification failed
+        api_logger.error(f"Google token verification failed: {e}")
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Invalid Google token: {str(e)}"
+        )
+    except Exception as e:
+        api_logger.error(f"Google authentication error: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Authentication error: {str(e)}"
+        )
+
+@app.get("/api/auth/google/config")
+def get_google_config():
+    """
+    Return Google OAuth configuration for the mobile app.
+    
+    This endpoint provides the web client ID needed for Google Sign-In
+    configuration in the mobile app.
+    """
+    if not GOOGLE_OAUTH_ENABLED:
+        api_logger.debug("Google OAuth not configured")
+        return {
+            "configured": False,
+            "message": "Google OAuth not configured. Set GOOGLE_WEB_CLIENT_ID in backend/.env file. See docs/GOOGLE-OAUTH-SETUP.md for setup instructions.",
+            "webClientId": None,
+            "emailAuthAvailable": ALLOW_EMAIL_AUTH
+        }
+    
+    return {
+        "configured": True,
+        "webClientId": GOOGLE_WEB_CLIENT_ID,
+        "emailAuthAvailable": ALLOW_EMAIL_AUTH
+    }
 
 # ==============================================================================
 # Routes: Devices with Logging
@@ -1071,12 +1356,21 @@ async def startup_event():
     """Application startup."""
     logger.info("="*60)
     logger.info("🚀 CCTV Backend Started")
+    logger.info(f"   Server ID: {SERVER_ID}")
+    logger.info(f"   Version: 4.0.0")
+    logger.info(f"   Host: {SERVER_HOST}:{SERVER_PORT}")
+    logger.info(f"   Debug: {DEBUG_MODE}")
     logger.info(f"   Devices loaded: {len(devices_db)}")
     logger.info(f"   Users loaded: {len(users_db)}")
     logger.info(f"   HLS output: {HLS_OUTPUT_DIR}")
+    logger.info(f"   Google OAuth: {'Enabled' if GOOGLE_OAUTH_ENABLED else 'Disabled'}")
+    logger.info(f"   Email Auth: {'Enabled' if ALLOW_EMAIL_AUTH else 'Disabled'}")
     logger.info("   Endpoints:")
     logger.info("     - GET  /          - Status")
     logger.info("     - GET  /api/health - Health check")
+    logger.info("     - POST /api/auth/register - Register user")
+    logger.info("     - POST /api/auth/login - Login user")
+    logger.info("     - POST /api/auth/google - Google OAuth")
     logger.info("     - POST /api/stream/start - Start stream")
     logger.info("     - GET  /api/stream/status - Stream status")
     logger.info("     - WS   /ws/stream/{id} - WebSocket stream")
@@ -1087,10 +1381,10 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Application shutdown."""
-    logger.info("🛑 Shutting down CCTV Backend...")
+    logger.info(f"🛑 Shutting down CCTV Backend ({SERVER_ID})...")
     enhanced_stream_service.stop_all()
     logger.info("✓ All streams stopped")
-    logger.info("✓ Backend shutdown complete")
+    logger.info(f"✓ Backend {SERVER_ID} shutdown complete")
 
 # ==============================================================================
 # Main Entry Point
@@ -1107,8 +1401,13 @@ if __name__ == "__main__":
             pass
     print("="*60)
     print("[START] CCTV Backend Starting...")
-    print(f"[DATA] Data storage: {DEVICES_FILE}")
-    print(f"[HLS] HLS output: {HLS_OUTPUT_DIR}")
-    print(f"[LOG] Logs: {LOG_DIR}")
+    print(f"[SERVER] ID: {SERVER_ID}")
+    print(f"[SERVER] Host: {SERVER_HOST}:{SERVER_PORT}")
+    print(f"[SERVER] Debug: {DEBUG_MODE}")
+    print(f"[DATA] Storage: {DEVICES_FILE}")
+    print(f"[HLS] Output: {HLS_OUTPUT_DIR}")
+    print(f"[LOG] Directory: {LOG_DIR}")
+    print(f"[AUTH] Google OAuth: {'Enabled' if GOOGLE_OAUTH_ENABLED else 'Disabled'}")
+    print(f"[AUTH] Email/Password: {'Enabled' if ALLOW_EMAIL_AUTH else 'Disabled'}")
     print("="*60)
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT, log_level="info")

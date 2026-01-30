@@ -20,5 +20,12 @@ requests>=2.31.0
 # Configuration
 python-dotenv>=1.0.0
 
+# Google OAuth
+google-auth>=2.28.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+httplib2>=0.22.0
+cachetools>=5.3.0
+
 # Optional: For hardware acceleration (uncomment if needed)
 # opencv-python-headless>=4.9.0.80  # Alternative without GUI
