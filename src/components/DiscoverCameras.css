@@ -1,0 +1,419 @@
+* {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+}
+
+.discover-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  overflow: hidden;
+  position: fixed;
+  left: 0;
+  top: 0;
+}
+
+.discover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 100;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.discover-back {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #000;
+  padding: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.discover-back:hover {
+  background: #f5f5f5;
+}
+
+.discover-back:active {
+  background: #e8e8e8;
+}
+
+.discover-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #000;
+  margin: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.discover-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.discover-subtitle {
+  font-size: 14px;
+  color: #555;
+  text-align: center;
+  margin: 0 0 16px 0;
+  font-weight: 500;
+}
+
+.discover-mode-toggle {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  background: #f5f5f5;
+  padding: 4px;
+  border-radius: 12px;
+  width: 100%;
+}
+
+.discover-mode-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background: #f5f5f5;
+  color: #999;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.discover-mode-btn:hover {
+  opacity: 0.8;
+}
+
+.discover-mode-btn.active {
+  background: #000;
+  color: white;
+}
+
+.discover-mode-btn.active:hover {
+  background: #1a1a1a;
+}
+
+.discover-section {
+  background: #f9f9f9;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.discover-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.discover-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #000;
+  margin: 0;
+}
+
+.discover-scan-again {
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+  cursor: pointer;
+  padding: 0;
+}
+
+.discover-scan-again:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.discover-empty-state {
+  background: white;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 32px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+.discover-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.discover-empty-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 8px 0;
+}
+
+.discover-empty-text {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 16px 0;
+  font-weight: 500;
+}
+
+.discover-retry-btn {
+  background: #000;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.discover-retry-btn:hover:not(:disabled) {
+  background: #1a1a1a;
+}
+
+.discover-retry-btn:active:not(:disabled) {
+  background: #000;
+  transform: scale(0.98);
+}
+
+.discover-retry-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.discover-devices-list {
+  background: white;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.discover-device-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.2s;
+}
+
+.discover-device-item:hover {
+  background: #f9f9f9;
+}
+
+.discover-device-item:last-child {
+  border-bottom: none;
+}
+
+.discover-device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.discover-device-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+.discover-device-signal {
+  font-size: 12px;
+  color: #999;
+}
+
+.discover-device-pair {
+  background: #000;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.discover-device-pair:hover {
+  background: #1a1a1a;
+}
+
+.discover-device-pair:active {
+  background: #000;
+  transform: scale(0.96);
+}
+
+.discover-instructions {
+  background: white;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.discover-instruction-item {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.discover-instruction-item:last-child {
+  border-bottom: none;
+}
+
+.discover-instruction-number {
+  width: 32px;
+  height: 32px;
+  background: #000;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.discover-instruction-text {
+  font-size: 14px;
+  color: #444;
+  margin: 0;
+  padding-top: 2px;
+  font-weight: 500;
+}
+
+@media (min-width: 481px) {
+  body {
+    height: auto;
+    overflow: auto;
+  }
+
+  #root {
+    height: auto;
+  }
+
+  .discover-container {
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+    position: static;
+  }
+
+  .discover-content {
+    padding: 32px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .discover-header {
+    padding: 20px 32px;
+  }
+
+  .discover-title {
+    font-size: 24px;
+  }
+
+  .discover-subtitle {
+    font-size: 16px;
+    margin-bottom: 24px;
+  }
+
+  .discover-mode-toggle {
+    margin-bottom: 32px;
+  }
+
+  .discover-mode-btn {
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  .discover-section {
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .discover-section-title {
+    font-size: 18px;
+  }
+
+  .discover-empty-state {
+    padding: 48px 40px;
+    min-height: 320px;
+  }
+
+  .discover-empty-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+  }
+
+  .discover-empty-title {
+    font-size: 20px;
+    margin-bottom: 12px;
+  }
+
+  .discover-empty-text {
+    font-size: 15px;
+    margin-bottom: 24px;
+  }
+
+  .discover-retry-btn {
+    padding: 12px 32px;
+    font-size: 15px;
+  }
+
+  .discover-instruction-item {
+    padding: 20px;
+    gap: 16px;
+  }
+
+  .discover-instruction-number {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .discover-instruction-text {
+    font-size: 15px;
+  }
+}
