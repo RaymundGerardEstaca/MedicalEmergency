@@ -1,157 +1,80 @@
-// Mock API Service
-// Simulates backend responses for testing without a real server
+export const mockApi = {
+  // Mock user database
+  users: [
+    {
+      id: "1",
+      email: "test@example.com",
+      password: "password123",
+      name: "Test User",
+    },
+  ],
 
-const MOCK_DELAY = 800; // Simulate network delay
+  // Simulates network delay
+  delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  login: async function(email, password) {
+    await this.delay(1500); // 1.5 second delay
 
-export const mockAuthAPI = {
-  login: async (email, password) => {
-    await delay(MOCK_DELAY);
-    
-    if (!email || !password) {
-      throw new Error("Email and password required");
+    const user = this.users.find((u) => u.email === email);
+
+    if (!user) {
+      return {
+        success: false,
+        message: "User not found",
+      };
     }
-    
-    // Simulate successful login
-    return {
-      token: "mock_jwt_token_" + Date.now(),
-      user: {
-        id: "user_123",
-        email: email,
-        name: email.split("@")[0]
-      }
-    };
-  },
 
-  signup: async (email, password, name) => {
-    await delay(MOCK_DELAY);
-    
-    if (!email || !password || !name) {
-      throw new Error("All fields required");
+    if (user.password !== password) {
+      return {
+        success: false,
+        message: "Incorrect password",
+      };
     }
-    
-    if (password.length < 6) {
-      throw new Error("Password must be at least 6 characters");
-    }
-    
-    // Simulate successful signup
-    return {
-      token: "mock_jwt_token_" + Date.now(),
-      user: {
-        id: "user_" + Math.random().toString(36).substr(2, 9),
-        email: email,
-        name: name
-      }
-    };
-  },
 
-  googleSignIn: async (googleToken) => {
-    await delay(MOCK_DELAY);
-    
-    // Simulate Google login
-    return {
-      token: "mock_google_jwt_" + Date.now(),
-      user: {
-        id: "user_google_123",
-        email: "user@gmail.com",
-        name: "Google User"
-      }
-    };
-  },
+    // Exclude password from the returned user data
+    const { password: _, ...userData } = user;
 
-  logout: () => {
-    localStorage.removeItem("authToken");
-  }
-};
-
-export const mockCameraAPI = {
-  getCameras: async () => {
-    await delay(MOCK_DELAY);
-    
-    // Return empty array (no cameras yet)
-    // In a real app, this would return user's cameras
-    return [];
-  },
-
-  addCamera: async (cameraData) => {
-    await delay(MOCK_DELAY);
-    
-    return {
-      id: "camera_" + Math.random().toString(36).substr(2, 9),
-      name: cameraData.name,
-      status: "online",
-      location: cameraData.location || "Living Room"
-    };
-  },
-
-  deleteCamera: async (cameraId) => {
-    await delay(MOCK_DELAY);
-    
-    return { success: true, message: "Camera deleted" };
-  },
-
-  getCameraStream: async (cameraId) => {
-    await delay(MOCK_DELAY);
-    
-    return {
-      streamUrl: "rtsp://example.com/stream",
-      status: "active"
-    };
-  }
-};
-
-export const mockDiscoveryAPI = {
-  scanDevices: async (mode) => {
-    await delay(2000); // Longer delay to simulate actual scanning
-    
-    // Simulate finding some devices based on mode
-    const devices = mode === "bluetooth" 
-      ? [
-          { id: "device_bt_1", name: "Camera 1", signal: "Strong (-45dBm)" },
-          { id: "device_bt_2", name: "Camera 2", signal: "Medium (-65dBm)" }
-        ]
-      : [
-          { id: "device_wifi_1", name: "SmartCam-5G", signal: "5GHz Network" },
-          { id: "device_wifi_2", name: "SmartCam-2G", signal: "2.4GHz Network" }
-        ];
-    
-    // Sometimes return empty to test "no devices" state
-    return Math.random() > 0.5 ? devices : [];
-  },
-
-  pairDevice: async (deviceId, mode) => {
-    await delay(MOCK_DELAY);
-    
     return {
       success: true,
-      deviceId: deviceId,
-      message: "Device paired successfully",
-      cameraInfo: {
-        id: "camera_" + Math.random().toString(36).substr(2, 9),
-        name: "Paired Camera",
-        status: "online"
-      }
+      message: "Login successful",
+      data: {
+        user: userData,
+        token: `mock-jwt-token-${user.id}-${Date.now()}`,
+      },
     };
   },
 
-  stopScan: async () => {
-    await delay(500);
-    
-    return { success: true };
-  }
-};
+  signup: async function(email, password, name = "New User") {
+    await this.delay(1500); // 1.5 second delay
 
-export const mockStatsAPI = {
-  getStats: async () => {
-    await delay(MOCK_DELAY);
-    
-    // Return mock dashboard statistics
-    return {
-      totalCameras: 3,
-      online: 2,
-      offline: 1,
-      alerts: 5
+    const existingUser = this.users.find((u) => u.email === email);
+
+    if (existingUser) {
+      return {
+        success: false,
+        message: "User already exists",
+      };
+    }
+
+    const newUser = {
+      id: Math.random().toString(36).substr(2, 9),
+      email,
+      password,
+      name,
     };
-  }
+
+    // Add to mock database
+    this.users.push(newUser);
+
+    const { password: _, ...userData } = newUser;
+
+    return {
+      success: true,
+      message: "Signup successful",
+      data: {
+        user: userData,
+        token: `mock-jwt-token-${newUser.id}-${Date.now()}`,
+      },
+    };
+  },
 };
